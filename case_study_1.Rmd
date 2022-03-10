@@ -9,7 +9,6 @@ output:
 ```{r}
 data(algae, package="DMwR2")
 algae
-
 ```
 
 ```{r}
@@ -21,6 +20,11 @@ summary(algae)
 hist(algae$mxPH, breaks = 30)
 ```
 ```{r}
+library(Hmisc)
+hist(subset(algae, select = c("mxPH", "mnO2", "Cl" ,"NO3", "NH4", "oPO4", "PO4", "Chla", "a1", "a2", "a3", "a4", "a5", "a6", "a7")), breaks = 20)
+```
+
+```{r}
 boxplot(algae$oPO4, main = "Boxplot for orthophosphate")
 ```
 ```{r}
@@ -29,7 +33,197 @@ boxplot(algae[algae$size == "small",]$a1, main  = "Small A1")
 boxplot(algae[algae$size == "medium",]$a1, main  = "Medium A1")
 boxplot(algae[algae$size == "large",]$a1, main  = "Large A1")
 ```
+## Correlation matrix
 ```{r}
-scatter.smooth(algae$mxPH, algae$a1)
+library(corrplot)
+M = cor(subset(algae, select = c("mxPH", "mnO2", "Cl" ,"NO3", "NH4", "oPO4", "PO4", "Chla", "a1", "a2", "a3", "a4", "a5", "a6", "a7")))
+corrplot(M, method = 'number',  tl.cex = 0.8, number.cex = 0.7)
 ```
+
+## Checking for NAs in Data
+
+```{r}
+sum(is.na(algae))
+```
+## Columns with na
+```{r}
+which(colSums(is.na(algae))>0)
+```
+## Removing rows with na
+```{r}
+algae <- na.omit(algae)
+```
+```{r}
+which(colSums(is.na(algae))>0)
+```
+## Correlation matrix
+```{r}
+M = cor(subset(algae, select = c("mxPH", "mnO2", "Cl" ,"NO3", "NH4", "oPO4", "PO4", "Chla", "a1", "a2", "a3", "a4", "a5", "a6", "a7")))
+corrplot(M, method = 'number', tl.cex = 0.8, number.cex = 0.7)
+```
+```{r}
+algae
+```
+# Regression for a1
+```{r}
+lm.a1 <- lm(a1 ~ ., data = algae[, 1:12])
+summary(lm.a1)
+```
+```{r}
+anova(lm.a1)
+```
+### Removing season from the model
+```{r}
+lm2.a1 <- update(lm.a1, . ~ . - season)
+summary(lm2.a1)
+```
+```{r}
+anova(lm.a1,lm2.a1)
+```
+```{r}
+final.lm <- step(lm.a1)
+```
+```{r}
+summary(final.lm)
+```
+## Regression Tree
+
+```{r}
+library(rpart)
+rt.a1 <- rpart(a1 ~ ., data = algae[, 1:12])
+rt.a1
+```
+```{r}
+library(rpart.plot)
+prp(rt.a1,extra=101,box.col="orange",split.box.col="grey")
+```
+```{r}
+printcp(rt.a1)
+```
+### Pruning
+```{r}
+rt2.a1 <- prune(rt.a1, cp = 0.08)
+rt2.a1
+```
+```{r}
+lm.predictions.a1 <- predict(final.lm, algae)
+rt.predictions.a1 <- predict(rt.a1, algae)
+```
+## Mean Absolute Error
+```{r}
+(mae.a1.lm <- mean(abs(lm.predictions.a1 - algae[["a1"]])))
+(mae.a1.rt <- mean(abs(rt.predictions.a1 - algae[["a1"]])))
+```
+## Mean Squared Error
+```{r}
+(mse.a1.lm <- mean((lm.predictions.a1 - algae[["a1"]])^2))
+(mse.a1.rt <- mean((rt.predictions.a1 - algae[["a1"]])^2))
+```
+## Normalized Mean Squared Error
+```{r}
+(nmse.a1.lm <- mean((lm.predictions.a1-algae[['a1']])^2)/mean((mean(algae[['a1']])-algae[['a1']])^2))
+(nmse.a1.rt <- mean((rt.predictions.a1-algae[['a1']])^2)/mean((mean(algae[['a1']])-algae[['a1']])^2))
+```
+
+# Adding mean for nas
+```{r}
+data(algae, package="DMwR2")
+algae
+```
+## Checking for NAs
+```{r}
+which(colSums(is.na(algae))>0)
+```
+
+```{r}
+mean_val <- colMeans(algae[,4:18],na.rm = TRUE)
+# replacing NA with mean value of each column
+for(i in colnames(algae))
+  algae[,i][is.na(algae[,i])] <- mean_val[i]
+algae
+```
+```{r}
+which(colSums(is.na(algae))>0)
+```
+## Correlation matrix
+```{r}
+M = cor(subset(algae, select = c("mxPH", "mnO2", "Cl" ,"NO3", "NH4", "oPO4", "PO4", "Chla", "a1", "a2", "a3", "a4", "a5", "a6", "a7")))
+corrplot(M, method = 'number', tl.cex = 0.8, number.cex = 0.7)
+```
+
+## Removing PO4 because of having high correlation with oPO4
+```{r}
+algae = subset(algae, select = -PO4)
+algae
+```
+
+```{r}
+dim(algae)
+```
+
+```{r}
+x = algae[,1:11]
+ind<-sample(1:2, size=nrow(x), replace=TRUE, prob =c(0.7, 0.3))
+train<-x[ind==1,]
+test<-x[ind==2,]
+```
+```{r}
+train
+```
+```{r}
+test
+```
+## Regression on training data
+```{r}
+lm.a1 <- lm(a1 ~ ., data = train)
+summary(lm.a1)
+```
+```{r}
+anova(lm.a1)
+```
+```{r}
+lm2.a1 <- update(lm.a1, . ~ . - season)
+summary(lm2.a1)
+```
+## Predictions
+```{r}
+preds = predict(lm2.a1, test)
+preds
+```
+```{r}
+rmse_lm = sqrt(mean((test$a1 - preds)^2))
+rmse_lm
+```
+## Regression Tree
+```{r}
+rt.a1 <- rpart(a1 ~ ., data = train)
+rt.a1
+```
+
+```{r}
+prp(rt.a1,extra=101,box.col="orange",split.box.col="grey")
+```
+
+```{r}
+rt2.a1 <- prune(rt.a1, cp = 0.08) 
+rt2.a1
+```
+## Prediction on Regression Tree
+```{r}
+rt_preds = predict(rt2.a1, test)
+rt_preds
+```
+```{r}
+rmse_rt = sqrt(mean((test$a1 - rt_preds)^2))
+rmse_rt
+```
+
+
+
+
+
+
+
+
+
 
