@@ -2,8 +2,10 @@
 title: 'Case Study 1: Predicting Algae Blooms'
 output:
   html_document:
+    keep_md: yes
     df_print: paged
   pdf_document: default
+  rmarkdown: default
 ---
 
 ```{r}
